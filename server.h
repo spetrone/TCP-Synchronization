@@ -15,6 +15,7 @@ Last modified: november 12, 2022
 #include <unistd.h>
 #include <sys/wait.h>
 #include <semaphore.h>
+#include <errno.h> //for semaphore EAGAIN
 #include <fcntl.h>           /* For O_* constants */
 #include <sys/stat.h>        /* For mode constants */
 

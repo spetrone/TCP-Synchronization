@@ -6,7 +6,7 @@
 #include "server.h"
 #include "client.h"
 
-#define NUMPHIL 5
+#define NUMPHIL 4
 
 
 int main (void) {

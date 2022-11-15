@@ -29,12 +29,35 @@ int runServer(int port)
 
 
 
-
 	int status; //holds status of child process when parent waiting
 	pid_t pidS; //for slave process pid when testing if they are finished from parent
 	int slaveProcCount = 0; //used for counting completed slave processes to close listening socket
-	
 
+
+
+	char semName[8] = "sem";
+	char semNumStr[5];
+	int locktest = -1; //used for testing semaphore
+
+	sprintf(semNumStr, "%d", port);
+	strcat(semName, semNumStr);
+	printf("SEMAPHORE NAME: %s", semName);
+
+	sem_t *mutex = sem_open(semName, O_CREAT | O_EXCL, 0644, 1);
+
+	//test if there were errors in creation of semaphore
+    if (mutex == SEM_FAILED) {
+        perror("sem_open(3) error");
+        exit(1);
+    }
+
+	//Close the semaphore not using it in the parent process 
+    if (sem_close(mutex) < 0) {
+        perror("sem_close(3) failed");
+        //ignore sem_unlink(3) errors
+        sem_unlink(semName);
+        exit(1);
+    } 
 
 	//create socket
 	listenSock = socket(PF_INET, SOCK_STREAM, 0);
@@ -78,13 +101,6 @@ int runServer(int port)
 
 
 
-	//Close the semaphore not using it in the parent process 
-    /*if (sem_close(semaphore) < 0) {
-        perror("sem_close(3) failed");
-        // We ignore possible sem_unlink(3) errors here 
-        sem_unlink(semName);
-        exit(EXIT_FAILURE);
-    } */
 
     
 	//iteratively accept connection
@@ -104,12 +120,6 @@ int runServer(int port)
 
 			printf("...............Spawning slave process................\n");
 
-
-
-
-
-
-
 			if ((pid = fork()) < 0) {
 				perror("Error spawning slave process");
 				exit(1);
@@ -117,7 +127,12 @@ int runServer(int port)
 
 			if (pid == 0) { //child process
 
-
+			//open semaphore in child
+			mutex = sem_open(semName, O_RDWR);
+			if (mutex == SEM_FAILED) {
+				perror("child sem_open(3) failed");
+				exit(EXIT_FAILURE);
+			}
 
 			//receive first message then loop for more receiving
 			memset(buf, '\0', sizeof(buf)); //clear buffer
@@ -130,17 +145,44 @@ int runServer(int port)
 			//Run as a server, being the fork serving two philosophers
 			while (count > 0) {
 
-				memset(buf, '\0', sizeof(buf)); //clear buffer
-				strcpy(inputBuf, "given");
-	    		msgLength = strlen(inputBuf);
+				if((strcmp(buf, "request")) == 0) {
 
+
+					locktest = sem_trywait(mutex);
+					printf("*****LOCKTEST: %d on mutex: %d\n", locktest, &mutex);
+
+					if (locktest == 0) {
+						
+						memset(inputBuf, '\0', sizeof(buf)); //clear buffer
+						strcpy(inputBuf, "given");
+						msgLength = strlen(inputBuf);
+					}
+
+					if (locktest == EAGAIN){
+						printf("\n\nlocked!\n\n");
+						memset(inputBuf, '\0', sizeof(buf)); //clear buffer
+						strcpy(inputBuf, "locked");
+						msgLength = strlen(inputBuf);
+					}
+					else if (locktest == -1){
+						perror("Error with mutex in server doing trywait()");
+						exit(1);
+					} 
+
+				}
+				else if((strcmp(buf, "return")) == 0) {
+					sem_post(mutex);
+
+				} 
+
+
+				//send message about whether fork is taken or not
 				if ((send(connectSock, inputBuf, msgLength, 0)) != msgLength)
 				{
 					perror("Error with send(): ");
 				}
-
 				//receive next message
-				memset(buf, '\0', sizeof(buf)); //reset buffer
+				memset(buf, '\0', sizeof(inputBuf)); //reset buffer
 				count = recv(connectSock, buf, sizeof(buf), 0); 
 
 			}
@@ -170,7 +212,8 @@ int runServer(int port)
 			//close client socket 
 			close(connectSock);
 
-
+			if (sem_close(mutex) < 0)
+        		perror("sem_close(3) failed");
 
 			exit(0); //exit child process
 				
@@ -193,6 +236,10 @@ int runServer(int port)
   	--slaveProcCount; 
 	}
 	
+	//unlink semaphore
+	if (sem_unlink(semName) < 0)
+    perror("sem_unlink(3) failed");
+
 	//all slave processes must have completed (from while loop above)
 	//close the listening socket
 	close(listenSock);

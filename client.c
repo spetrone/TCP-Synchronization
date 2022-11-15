@@ -70,21 +70,21 @@ int runClient(int portL, int portR)
 	    	strcpy(inputBuf, "request");
 	    	msgLength = strlen(inputBuf); 
 
-		if((count = send(sockidL, inputBuf, msgLength, 0)) != msgLength)
-		{
-			perror("Error with send(): \n");
-			return -1;
-		}
-		else
-			printf("requesting left fork ***\n");
+			if((count = send(sockidL, inputBuf, msgLength, 0)) != msgLength)
+			{
+				perror("Error with send(): \n");
+				return -1;
+			}
+			else
+				printf("requesting left fork ***\n");
 
-		//receive echo
-		memset(recBuf, '\0', sizeof(recBuf)); //reset buffer
-		count = recv(sockidL, recBuf, sizeof(recBuf), 0);
+			//receive echo
+			memset(recBuf, '\0', sizeof(recBuf)); //reset buffer
+			count = recv(sockidL, recBuf, sizeof(recBuf), 0);
 
-		if (strcmp(recBuf, "given") == 0 ) {
-			leftFork = 1;
-		} //wil exit loop, otherwise will keep looping until it is given
+			if (strcmp(recBuf, "given") == 0 ) {
+				leftFork = 1;
+			} //wil exit loop, otherwise will keep looping until it is given
 
 		}
 		//then picks up the right fork
