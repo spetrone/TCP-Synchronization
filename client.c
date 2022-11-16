@@ -16,6 +16,7 @@ int runClient(int portL, int portR)
 	int philEatCount = 0; //calculating how much philsosopher has eaten
 	int leftFork = 0; //determines if the philospher has the left fork
 	int rightFork = 0; //determines if the philosopher has the right fork
+	int doneEating = 0; //used to determine if it is time for philosopher to think
 
 
  	//set server address information for left hand
@@ -65,58 +66,101 @@ int runClient(int portL, int portR)
 	//loop until eaten enought or so much time has passed (deadlock?)
 	while (philEatCount < PHIL_EAT_REQ) {
 
-		//wait for forks
-		//left fork first, request from the fork server
-		while(!leftFork) {
-			memset(inputBuf, '\0', sizeof(inputBuf)); //set buffer to 0
-	    	strcpy(inputBuf, "request");
-	    	msgLength = strlen(inputBuf); 
+		//while the philosopher is not done eating (they are waiting)
+		while (!doneEating) {
+			//wait for forks
+			//left fork first, request from the fork server
+			while(!leftFork) {
+				memset(inputBuf, '\0', sizeof(inputBuf)); //set buffer to 0
+				strcpy(inputBuf, "request");
+				msgLength = strlen(inputBuf); 
 
-			if((count = send(sockidL, inputBuf, msgLength, 0)) != msgLength)
-			{
-				perror("Error with send(): \n");
-				return -1;
+				if((count = send(sockidL, inputBuf, msgLength, 0)) != msgLength)
+				{
+					perror("Error with send(): \n");
+					return -1;
+				}
+				else
+					printf("requesting left fork ***\n");
+
+				//receive echo
+				memset(recBuf, '\0', sizeof(recBuf)); //reset buffer
+				count = recv(sockidL, recBuf, sizeof(recBuf), 0);
+
+				if (strcmp(recBuf, "given") == 0 ) {
+					leftFork = 1;
+				} //wil exit loop, otherwise will keep looping until it is given
+
 			}
-			else
-				printf("requesting left fork ***\n");
+			//then picks up the right fork
 
-			//receive echo
-			memset(recBuf, '\0', sizeof(recBuf)); //reset buffer
-			count = recv(sockidL, recBuf, sizeof(recBuf), 0);
+			if(!rightFork) {
+				memset(inputBuf, '\0', sizeof(inputBuf)); //set buffer to 0
+				strcpy(inputBuf, "request");
+				msgLength = strlen(inputBuf); 
 
-			if (strcmp(recBuf, "given") == 0 ) {
-				leftFork = 1;
-			} //wil exit loop, otherwise will keep looping until it is given
+				if((count = send(sockidR, inputBuf, msgLength, 0)) != msgLength)
+				{
+					perror("Error with send(): \n");
+					return -1;
+				}
+				else
+					printf("requesting right fork ***\n");
 
-		}
-		//then picks up the right fork
+				//receive echo
+				memset(recBuf, '\0', sizeof(recBuf)); //reset buffer
+				count = recv(sockidR, recBuf, sizeof(recBuf), 0);
 
-		if(!rightFork) {
-			memset(inputBuf, '\0', sizeof(inputBuf)); //set buffer to 0
-	    	strcpy(inputBuf, "request");
-	    	msgLength = strlen(inputBuf); 
+				if (strcmp(recBuf, "given") == 0 ) {
+					rightFork = 1;
+				} //will  eat at next step, otherwise put forks both back down
+				else {
 
-			if((count = send(sockidR, inputBuf, msgLength, 0)) != msgLength)
-			{
-				perror("Error with send(): \n");
-				return -1;
+					leftFork = 0;
+					rightFork = 0;
+
+					//release the forks, right not taken so only return left
+					memset(inputBuf, '\0', sizeof(inputBuf)); //set buffer to 0
+					strcpy(inputBuf, "return");
+					msgLength = strlen(inputBuf); 
+
+					if((count = send(sockidL, inputBuf, msgLength, 0)) != msgLength)
+					{
+						perror("Error with send(): returning left fork\n");
+						return -1;
+					}
+					else
+						printf("returning left fork ***\n");
+
+				}
+
 			}
-			else
-				printf("requesting right fork ***\n");
 
-			//receive echo
-			memset(recBuf, '\0', sizeof(recBuf)); //reset buffer
-			count = recv(sockidR, recBuf, sizeof(recBuf), 0);
-
-			if (strcmp(recBuf, "given") == 0 ) {
-				rightFork = 1;
-			} //will  eat at next step, otherwise put forks both back down
-			else {
-
+			//eat when they have both forks, each time they eat they have the forks for 2 second and 
+			//increment eating amount by 
+			if (rightFork == 1 && leftFork == 1) {
+				printf("\n\nPHILOSOPHER HAS BOTH FORKS\n\n");
+				philEatCount +=30 ;
+				sleep(2); //eating time
 				leftFork = 0;
 				rightFork = 0;
+				doneEating = 1; //set flag, time to think
 
-				//release the forks, right not taken so only return left
+				//release the forks, right then left
+				memset(inputBuf, '\0', sizeof(inputBuf)); //set buffer to 0
+				strcpy(inputBuf, "return");
+				msgLength = strlen(inputBuf); 
+
+				//communicate with server that philosopher client is returning the right fork
+				if((count = send(sockidR, inputBuf, msgLength, 0)) != msgLength)
+				{
+					perror("Error with send(): returning right fork\n");
+					return -1;
+				}
+				else
+					printf("returning right fork ***\n");
+
+				//communicate with server that philosopher client is returning the left fork
 				memset(inputBuf, '\0', sizeof(inputBuf)); //set buffer to 0
 				strcpy(inputBuf, "return");
 				msgLength = strlen(inputBuf); 
@@ -128,51 +172,13 @@ int runClient(int portL, int portR)
 				}
 				else
 					printf("returning left fork ***\n");
-
 			}
-
 		}
-
-		//eat when they have both forks, each time they eat they have the forks for 2 second and 
-		//increment eating amount by 
-		if (rightFork == 1 && leftFork == 1) {
-			printf("\n\nPHILOSOPHER HAS BOTH FORKS\n\n");
-			philEatCount +=30 ;
-			sleep(2); //eating time
-			leftFork = 0;
-			rightFork = 0;
-
-			//release the forks, right then left
-			memset(inputBuf, '\0', sizeof(inputBuf)); //set buffer to 0
-			strcpy(inputBuf, "return");
-			msgLength = strlen(inputBuf); 
-
-			if((count = send(sockidR, inputBuf, msgLength, 0)) != msgLength)
-			{
-				perror("Error with send(): returning right fork\n");
-				return -1;
-			}
-			else
-				printf("returning right fork ***\n");
-
-			sleep(1);
-			memset(inputBuf, '\0', sizeof(inputBuf)); //set buffer to 0
-			strcpy(inputBuf, "return");
-			msgLength = strlen(inputBuf); 
-
-			if((count = send(sockidL, inputBuf, msgLength, 0)) != msgLength)
-			{
-				perror("Error with send(): returning left fork\n");
-				return -1;
-			}
-			else
-				printf("returning left fork ***\n");
-
 
 			//think
 			sleep(3);
-		
-		}
+			//now philosopher needs to wait again, set flag
+			doneEating = 0;
 		
 	}
 	
@@ -232,6 +238,8 @@ int runClient(int portL, int portR)
 
 	//close right
 	close(sockidR);
+
+	printf("\n\n*************** PHILOSOPHER IS DONE ***************\n\n");
 
     return 0;
 
