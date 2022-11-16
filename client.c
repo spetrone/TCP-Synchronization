@@ -17,6 +17,7 @@ int runClient(int portL, int portR)
 	int leftFork = 0; //determines if the philospher has the left fork
 	int rightFork = 0; //determines if the philosopher has the right fork
 	int doneEating = 0; //used to determine if it is time for philosopher to think
+	clock_t deadlockTime = 0; //deadlock time is counted in seconds
 
 
  	//set server address information for left hand
@@ -64,13 +65,22 @@ int runClient(int portL, int portR)
 	//dining philosophers problem, this is a philosopher's hand
 
 	//loop until eaten enought or so much time has passed (deadlock?)
-	while (philEatCount < PHIL_EAT_REQ) {
+	clock_t start = clock(); //start time for philosopher trying to complete its process
+	clock_t max = DEADLOCK_MAX * CLOCKS_PER_SEC;
+	while (philEatCount < PHIL_EAT_REQ && (deadlockTime < max)) {
 
+		
 		//while the philosopher is not done eating (they are waiting)
-		while (!doneEating) {
+		while (!doneEating && deadlockTime < max) {
+			
+			
 			//wait for forks
 			//left fork first, request from the fork server
-			while(!leftFork) {
+			while(!leftFork && deadlockTime < max) {
+				printf("\nmax is: %li\n", max);
+				deadlockTime += ((clock() - start)); //add time to count towards deadlock
+				printf("Deadlock time: %li,\n", deadlockTime);
+
 				memset(inputBuf, '\0', sizeof(inputBuf)); //set buffer to 0
 				strcpy(inputBuf, "request");
 				msgLength = strlen(inputBuf); 
@@ -110,12 +120,13 @@ int runClient(int portL, int portR)
 				//receive echo
 				memset(recBuf, '\0', sizeof(recBuf)); //reset buffer
 				count = recv(sockidR, recBuf, sizeof(recBuf), 0);
+				printf("*** MESSAGE from fork server: %s \n", recBuf);
 
 				if (strcmp(recBuf, "given") == 0 ) {
 					rightFork = 1;
 				} //will  eat at next step, otherwise put forks both back down
 				else {
-
+					
 					leftFork = 0;
 					rightFork = 0;
 
@@ -139,8 +150,9 @@ int runClient(int portL, int portR)
 			//eat when they have both forks, each time they eat they have the forks for 2 second and 
 			//increment eating amount by 
 			if (rightFork == 1 && leftFork == 1) {
-				printf("\n\nPHILOSOPHER HAS BOTH FORKS\n\n");
+				printf("\n\nPHILOSOPHER HAS BOTH FORKS, EATING\n\n");
 				philEatCount +=30 ;
+				deadlockTime = 0; //not in deadlock, reset it to 0
 				sleep(2); //eating time
 				leftFork = 0;
 				rightFork = 0;
@@ -175,11 +187,13 @@ int runClient(int portL, int portR)
 			}
 		}
 
-			//think
-			sleep(3);
-			//now philosopher needs to wait again, set flag
-			doneEating = 0;
-		
+			//think only when done eating
+			if(doneEating) {
+				sleep(3); //think
+				printf("\nPHILOSOPHER IS THINKING\n");
+				//now philosopher needs to wait again, set flag
+				doneEating = 0;
+			}
 	}
 	
 
@@ -239,7 +253,13 @@ int runClient(int portL, int portR)
 	//close right
 	close(sockidR);
 
-	printf("\n\n*************** PHILOSOPHER IS DONE ***************\n\n");
+	if (deadlockTime > DEADLOCK_MAX) {
+		printf("\n\n***********EXITED DUE TO DEADLOCK**************\n\n");
+	}
+	else {
+		printf("\n\n*************** PHILOSOPHER IS DONE ***************\n\n");
+	}
+	
 
     return 0;
 

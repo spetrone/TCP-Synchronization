@@ -26,6 +26,7 @@ int runServer(int port)
 	char IP_str[16]; //for holding string of IP addr (up tp 16 chars)
 	int completeCon = 0; //counter of number of connections hich have been completed
 	pid_t pid; //for child processes with
+	
 
 
 
@@ -106,7 +107,6 @@ int runServer(int port)
 	//iteratively accept connection
 	while(completeCon < NUM_CON)
 	{
-
 		//accept new connection
 		if(( connectSock = accept(listenSock,(struct sockaddr *) &clientAddr, &addrLen)) == -1)
 		{
@@ -150,22 +150,23 @@ int runServer(int port)
 				if((strcmp(buf, "request")) == 0) {
 
 
-					locktest = sem_trywait(mutex);
-					printf("*****LOCKTEST: %d on mutex: %d\n", locktest, &mutex);
-
-					if (locktest == 0) {
+					if ((sem_trywait(mutex)) < 0)
+					printf("\n\n\nIN trywait failed\n\n");
+						//printf("*****LOCKTEST: %d on mutex\n", locktest);
+						if (errno == EAGAIN){
+						printf("\n\nlocked!\n\n");
+						memset(inputBuf, '\0', sizeof(buf)); //clear buffer
+						strcpy(inputBuf, "locked");
+						msgLength = strlen(inputBuf);
+					}
+					else {
 						
 						memset(inputBuf, '\0', sizeof(buf)); //clear buffer
 						strcpy(inputBuf, "given");
 						msgLength = strlen(inputBuf);
 					}
 
-					if (locktest == -1){
-						printf("\n\nlocked!\n\n");
-						memset(inputBuf, '\0', sizeof(buf)); //clear buffer
-						strcpy(inputBuf, "locked");
-						msgLength = strlen(inputBuf);
-					}
+
 					/*else if (locktest == -1){
 						perror("Error with mutex in server doing trywait()");
 						exit(1);
@@ -173,7 +174,9 @@ int runServer(int port)
 
 				}
 				else if((strcmp(buf, "return")) == 0) {
-					
+					memset(inputBuf, '\0', sizeof(buf)); //clear buffer
+					strcpy(inputBuf, "fork_returned");
+					msgLength = strlen(inputBuf);
 					sem_post(mutex);
 
 				} 
