@@ -134,6 +134,8 @@ int runServer(int port)
 				exit(EXIT_FAILURE);
 			}
 
+			sem_post(mutex);
+
 			//receive first message then loop for more receiving
 			memset(buf, '\0', sizeof(buf)); //clear buffer
 			if((count = recv(connectSock, buf, sizeof(buf), 0)) < 0)
@@ -158,19 +160,20 @@ int runServer(int port)
 						msgLength = strlen(inputBuf);
 					}
 
-					if (locktest == EAGAIN){
+					if (locktest == -1){
 						printf("\n\nlocked!\n\n");
 						memset(inputBuf, '\0', sizeof(buf)); //clear buffer
 						strcpy(inputBuf, "locked");
 						msgLength = strlen(inputBuf);
 					}
-					else if (locktest == -1){
+					/*else if (locktest == -1){
 						perror("Error with mutex in server doing trywait()");
 						exit(1);
-					} 
+					} */
 
 				}
 				else if((strcmp(buf, "return")) == 0) {
+					
 					sem_post(mutex);
 
 				} 

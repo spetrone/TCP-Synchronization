@@ -1,5 +1,7 @@
 #include "client.h"
 
+
+
 int runClient(int portL, int portR)
 {
 	
@@ -89,7 +91,7 @@ int runClient(int portL, int portR)
 		}
 		//then picks up the right fork
 
-		while(!rightFork) {
+		if(!rightFork) {
 			memset(inputBuf, '\0', sizeof(inputBuf)); //set buffer to 0
 	    	strcpy(inputBuf, "request");
 	    	msgLength = strlen(inputBuf); 
@@ -108,17 +110,70 @@ int runClient(int portL, int portR)
 
 			if (strcmp(recBuf, "given") == 0 ) {
 				rightFork = 1;
-			} //will exit loop, otherwise will keep looping until it is given
+			} //will  eat at next step, otherwise put forks both back down
+			else {
+
+				leftFork = 0;
+				rightFork = 0;
+
+				//release the forks, right not taken so only return left
+				memset(inputBuf, '\0', sizeof(inputBuf)); //set buffer to 0
+				strcpy(inputBuf, "return");
+				msgLength = strlen(inputBuf); 
+
+				if((count = send(sockidL, inputBuf, msgLength, 0)) != msgLength)
+				{
+					perror("Error with send(): returning left fork\n");
+					return -1;
+				}
+				else
+					printf("returning left fork ***\n");
+
+			}
 
 		}
 
-		printf("\n\nPHILOSOPHER HAS BOTH FORKS\n\n");
-		philEatCount = PHIL_EAT_REQ;
-
 		//eat when they have both forks, each time they eat they have the forks for 2 second and 
-		//increment eating amount by 2
+		//increment eating amount by 
+		if (rightFork == 1 && leftFork == 1) {
+			printf("\n\nPHILOSOPHER HAS BOTH FORKS\n\n");
+			philEatCount +=30 ;
+			sleep(2); //eating time
+			leftFork = 0;
+			rightFork = 0;
 
-		//think for 3 seconds
+			//release the forks, right then left
+			memset(inputBuf, '\0', sizeof(inputBuf)); //set buffer to 0
+			strcpy(inputBuf, "return");
+			msgLength = strlen(inputBuf); 
+
+			if((count = send(sockidR, inputBuf, msgLength, 0)) != msgLength)
+			{
+				perror("Error with send(): returning right fork\n");
+				return -1;
+			}
+			else
+				printf("returning right fork ***\n");
+
+			sleep(1);
+			memset(inputBuf, '\0', sizeof(inputBuf)); //set buffer to 0
+			strcpy(inputBuf, "return");
+			msgLength = strlen(inputBuf); 
+
+			if((count = send(sockidL, inputBuf, msgLength, 0)) != msgLength)
+			{
+				perror("Error with send(): returning left fork\n");
+				return -1;
+			}
+			else
+				printf("returning left fork ***\n");
+
+
+			//think
+			sleep(3);
+		
+		}
+		
 	}
 	
 
