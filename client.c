@@ -77,6 +77,8 @@ int runClient(int portL, int portR)
 			//wait for forks
 			//left fork first, request from the fork server
 			while(!leftFork && deadlockTime < max) {
+
+
 				printf("\nmax is: %li\n", max);
 				deadlockTime += ((clock() - start)); //add time to count towards deadlock
 				printf("Deadlock time: %li,\n", deadlockTime);
